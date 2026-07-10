@@ -52,7 +52,26 @@ class UsersController < ApplicationController
       content = Rails.cache.fetch("users_tree_#{newest_user}", :expires_in => (60 * 60 * 24)) {
         users = User.select(*attrs).order("id DESC").to_a
         @user_count = users.length
-        @users_by_parent = users.group_by(&:invited_by_user_id)
+        @users_by_parent = begin
+          __r2rt_symbol_to_proc_materialization_collection = users
+          unless __r2rt_symbol_to_proc_materialization_collection.class == Array
+            __r2rt_symbol_to_proc_materialization_collection.group_by(&:invited_by_user_id)
+          else
+            __r2rt_symbol_to_proc_materialization_groups = {}
+            __r2rt_symbol_to_proc_materialization_index = 0
+            while __r2rt_symbol_to_proc_materialization_index < __r2rt_symbol_to_proc_materialization_collection.length
+              __r2rt_symbol_to_proc_materialization_item = __r2rt_symbol_to_proc_materialization_collection[__r2rt_symbol_to_proc_materialization_index]
+              __r2rt_symbol_to_proc_materialization_key = __r2rt_symbol_to_proc_materialization_item.invited_by_user_id
+              if __r2rt_symbol_to_proc_materialization_groups.key?(__r2rt_symbol_to_proc_materialization_key)
+                __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] << __r2rt_symbol_to_proc_materialization_item
+              else
+                __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] = [__r2rt_symbol_to_proc_materialization_item]
+              end
+              __r2rt_symbol_to_proc_materialization_index += 1
+            end
+            __r2rt_symbol_to_proc_materialization_groups
+          end
+        end
         @newest = User.select(*attrs).order("id DESC").limit(10)
         render_to_string :action => "tree", :layout => nil
       }

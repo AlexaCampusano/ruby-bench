@@ -346,11 +346,48 @@ class CommentsController < ApplicationController
       .joins(:story).where.not(stories: { is_deleted: true })
       .arrange_for_user(@user)
 
-    comments_by_thread_id = comments.group_by(&:thread_id)
+    comments_by_thread_id = begin
+      __r2rt_symbol_to_proc_materialization_collection = comments
+      unless __r2rt_symbol_to_proc_materialization_collection.class == Array
+        __r2rt_symbol_to_proc_materialization_collection.group_by(&:thread_id)
+      else
+        __r2rt_symbol_to_proc_materialization_groups = {}
+        __r2rt_symbol_to_proc_materialization_index = 0
+        while __r2rt_symbol_to_proc_materialization_index < __r2rt_symbol_to_proc_materialization_collection.length
+          __r2rt_symbol_to_proc_materialization_item = __r2rt_symbol_to_proc_materialization_collection[__r2rt_symbol_to_proc_materialization_index]
+          __r2rt_symbol_to_proc_materialization_key = __r2rt_symbol_to_proc_materialization_item.thread_id
+          if __r2rt_symbol_to_proc_materialization_groups.key?(__r2rt_symbol_to_proc_materialization_key)
+            __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] << __r2rt_symbol_to_proc_materialization_item
+          else
+            __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] = [__r2rt_symbol_to_proc_materialization_item]
+          end
+          __r2rt_symbol_to_proc_materialization_index += 1
+        end
+        __r2rt_symbol_to_proc_materialization_groups
+      end
+    end
     @threads = comments_by_thread_id.values_at(*thread_ids).compact
 
     if @user
-      @votes = Vote.comment_votes_by_user_for_story_hash(@user.id, comments.map(&:story_id).uniq)
+      @votes = Vote.comment_votes_by_user_for_story_hash(@user.id, begin
+        __r2rt_symbol_to_proc_materialization_collection = comments
+        unless __r2rt_symbol_to_proc_materialization_collection.class == Array
+          __r2rt_symbol_to_proc_materialization_collection.map(&:story_id).uniq
+        else
+          __r2rt_symbol_to_proc_materialization_result = []
+          __r2rt_symbol_to_proc_materialization_seen = {}
+          __r2rt_symbol_to_proc_materialization_index = 0
+          while __r2rt_symbol_to_proc_materialization_index < __r2rt_symbol_to_proc_materialization_collection.length
+            __r2rt_symbol_to_proc_materialization_value = __r2rt_symbol_to_proc_materialization_collection[__r2rt_symbol_to_proc_materialization_index].story_id
+            unless __r2rt_symbol_to_proc_materialization_seen.key?(__r2rt_symbol_to_proc_materialization_value)
+              __r2rt_symbol_to_proc_materialization_seen[__r2rt_symbol_to_proc_materialization_value] = true
+              __r2rt_symbol_to_proc_materialization_result << __r2rt_symbol_to_proc_materialization_value
+            end
+            __r2rt_symbol_to_proc_materialization_index += 1
+          end
+          __r2rt_symbol_to_proc_materialization_result
+        end
+      end)
 
       comments.each do |c|
         if @votes[c.id]

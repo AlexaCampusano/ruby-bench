@@ -345,37 +345,32 @@ class Story < ApplicationRecord
   end
 
   def as_json(options = {})
-    h = [
-      :short_id,
-      :short_id_url,
-      :created_at,
-      :title,
-      :url,
-      :score,
-      :score,
-      :flags,
-      { :comment_count => :comments_count },
-      { :description => :markeddown_description },
-      { :description_plain => :description },
-      :comments_url,
-      { :submitter_user => :user },
-      { :tags => self.tags.map(&:tag).sort },
-    ]
-
-    if options && options[:with_comments]
-      h.push(:comments => options[:with_comments])
-    end
-
     js = {}
-    h.each do |k|
-      if k.is_a?(Symbol)
-        js[k] = self.send(k)
-      elsif k.is_a?(Hash)
-        if k.values.first.is_a?(Symbol)
-          js[k.keys.first] = self.send(k.values.first)
-        else
-          js[k.keys.first] = k.values.first
-        end
+    js[:short_id] = short_id
+    js[:short_id_url] = short_id_url
+    js[:created_at] = created_at
+    js[:title] = title
+    js[:url] = url
+    js[:score] = score
+    js[:score] = score
+    js[:flags] = flags
+    js[:comment_count] = comments_count
+    js[:description] = markeddown_description
+    js[:description_plain] = description
+    js[:comments_url] = comments_url
+    js[:submitter_user] = user
+    __r2rt_static_field_mapping_value = self.tags.map(&:tag).sort
+    if __r2rt_static_field_mapping_value.is_a?(Symbol)
+      js[:tags] = __send__(__r2rt_static_field_mapping_value)
+    else
+      js[:tags] = __r2rt_static_field_mapping_value
+    end
+    if options && options[:with_comments]
+      __r2rt_static_field_mapping_value = options[:with_comments]
+      if __r2rt_static_field_mapping_value.is_a?(Symbol)
+        js[:comments] = __send__(__r2rt_static_field_mapping_value)
+      else
+        js[:comments] = __r2rt_static_field_mapping_value
       end
     end
 
@@ -513,13 +508,22 @@ class Story < ApplicationRecord
   def fix_bogus_chars
     # this is needlessly complicated to work around character encoding issues
     # that arise when doing just self.title.to_s.gsub(160.chr, "")
-    self.title = self.title.to_s.split("").map {|chr|
-      if chr.ord == 160
-        " "
+    self.title = begin
+      __r2rt_char_map_join_replacement_source = self.title.to_s
+      if __r2rt_char_map_join_replacement_source.empty?
+        String.new(encoding: Encoding::US_ASCII)
+      elsif __r2rt_char_map_join_replacement_source.encoding == Encoding::UTF_8 || __r2rt_char_map_join_replacement_source.ascii_only?
+        __r2rt_char_map_join_replacement_source.gsub([160].pack("U"), " ")
       else
-        chr
+        __r2rt_char_map_join_replacement_source.split("").map { |chr|
+          if chr.ord == 160
+            " "
+          else
+            chr
+          end
+        }.join("")
       end
-    }.join("")
+    end
 
     true
   end
@@ -551,16 +555,15 @@ class Story < ApplicationRecord
   end
 
   def html_class_for_user
-    c = []
     if !self.user.is_active?
-      c.push "inactive_user"
+      "inactive_user"
     elsif self.user.is_new?
-      c.push "new_user"
+      "new_user"
     elsif self.user_is_author?
-      c.push "user_is_author"
+      "user_is_author"
+    else
+      ""
     end
-
-    c.join("")
   end
 
   def is_flaggable?
@@ -771,7 +774,26 @@ class Story < ApplicationRecord
 
     # if enough users voted on the same set of replacement tags, do it
     tag_votes = {}
-    self.suggested_taggings.group_by(&:user_id).each do |_u, stg|
+    begin
+      __r2rt_symbol_to_proc_materialization_collection = self.suggested_taggings
+      unless __r2rt_symbol_to_proc_materialization_collection.class == Array
+        __r2rt_symbol_to_proc_materialization_collection.group_by(&:user_id)
+      else
+        __r2rt_symbol_to_proc_materialization_groups = {}
+        __r2rt_symbol_to_proc_materialization_index = 0
+        while __r2rt_symbol_to_proc_materialization_index < __r2rt_symbol_to_proc_materialization_collection.length
+          __r2rt_symbol_to_proc_materialization_item = __r2rt_symbol_to_proc_materialization_collection[__r2rt_symbol_to_proc_materialization_index]
+          __r2rt_symbol_to_proc_materialization_key = __r2rt_symbol_to_proc_materialization_item.user_id
+          if __r2rt_symbol_to_proc_materialization_groups.key?(__r2rt_symbol_to_proc_materialization_key)
+            __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] << __r2rt_symbol_to_proc_materialization_item
+          else
+            __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] = [__r2rt_symbol_to_proc_materialization_item]
+          end
+          __r2rt_symbol_to_proc_materialization_index += 1
+        end
+        __r2rt_symbol_to_proc_materialization_groups
+      end
+    end.each do |_u, stg|
       stg.each do |s|
         tag_votes[s.tag.tag] ||= 0
         tag_votes[s.tag.tag] += 1

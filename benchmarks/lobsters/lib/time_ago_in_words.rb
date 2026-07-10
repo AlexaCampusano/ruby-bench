@@ -6,20 +6,20 @@ module TimeAgoInWords
     elsif secs < 60
       "less than a minute ago"
     elsif secs < (60 * 60)
-      mins = (secs / 60.0).floor
-      "#{mins} #{'minute'.pluralize(mins)} ago"
+      mins = secs / 60
+      mins == 1 ? "1 minute ago" : "#{mins} minutes ago"
     elsif secs < (60 * 60 * 48)
-      hours = (secs / 60.0 / 60.0).floor
-      "#{hours} #{'hour'.pluralize(hours)} ago"
+      hours = secs / 3600
+      hours == 1 ? "1 hour ago" : "#{hours} hours ago"
     elsif secs < (60 * 60 * 24 * 30)
-      days = (secs / 60.0 / 60.0 / 24.0).floor
-      "#{days} #{'day'.pluralize(days)} ago"
+      days = secs / 86400
+      days == 1 ? "1 day ago" : "#{days} days ago"
     elsif secs < (60 * 60 * 24 * 365)
-      months = (secs / 60.0 / 60.0 / 24.0 / 30.0).floor
-      "#{months} #{'month'.pluralize(months)} ago"
+      months = secs / 2592000
+      months == 1 ? "1 month ago" : "#{months} months ago"
     else
-      years = (secs / 60.0 / 60.0 / 24.0 / 365.0).floor
-      "#{years} #{'year'.pluralize(years)} ago"
+      years = secs / 31536000
+      years == 1 ? "1 year ago" : "#{years} years ago"
     end
   end
 end

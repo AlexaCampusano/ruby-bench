@@ -103,10 +103,28 @@ class Comment < ApplicationRecord
     # expensive in both CPU + redundant RAM for the web workers.
     clear_replies_cache = false
 
-    parents = self.order(
+    parents = begin
+      __r2rt_symbol_to_proc_materialization_collection = self.order(
       Arel.sql("comments.score < 0 ASC, comments.confidence DESC")
     )
-      .group_by(&:parent_comment_id)
+      unless __r2rt_symbol_to_proc_materialization_collection.class == Array
+        __r2rt_symbol_to_proc_materialization_collection.group_by(&:parent_comment_id)
+      else
+        __r2rt_symbol_to_proc_materialization_groups = {}
+        __r2rt_symbol_to_proc_materialization_index = 0
+        while __r2rt_symbol_to_proc_materialization_index < __r2rt_symbol_to_proc_materialization_collection.length
+          __r2rt_symbol_to_proc_materialization_item = __r2rt_symbol_to_proc_materialization_collection[__r2rt_symbol_to_proc_materialization_index]
+          __r2rt_symbol_to_proc_materialization_key = __r2rt_symbol_to_proc_materialization_item.parent_comment_id
+          if __r2rt_symbol_to_proc_materialization_groups.key?(__r2rt_symbol_to_proc_materialization_key)
+            __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] << __r2rt_symbol_to_proc_materialization_item
+          else
+            __r2rt_symbol_to_proc_materialization_groups[__r2rt_symbol_to_proc_materialization_key] = [__r2rt_symbol_to_proc_materialization_item]
+          end
+          __r2rt_symbol_to_proc_materialization_index += 1
+        end
+        __r2rt_symbol_to_proc_materialization_groups
+      end
+    end
 
     # top-down list of comments, regardless of indent level
     ordered = []
@@ -164,35 +182,39 @@ class Comment < ApplicationRecord
   end
 
   def as_json(_options = {})
-    h = [
-      :short_id,
-      :short_id_url,
-      :created_at,
-      :updated_at,
-      :is_deleted,
-      :is_moderated,
-      :score,
-      :flags,
-      { :parent_comment => self.parent_comment && self.parent_comment.short_id },
-      { :comment => (self.is_gone? ? "<em>#{self.gone_text}</em>" : :markeddown_comment) },
-      { :comment_plain => (self.is_gone? ? self.gone_text : :comment) },
-      :url,
-      :indent_level,
-      { :commenting_user => :user },
-    ]
-
     js = {}
-    h.each do |k|
-      if k.is_a?(Symbol)
-        js[k] = self.send(k)
-      elsif k.is_a?(Hash)
-        if k.values.first.is_a?(Symbol)
-          js[k.keys.first] = self.send(k.values.first)
-        else
-          js[k.keys.first] = k.values.first
-        end
-      end
+    js[:short_id] = short_id
+    js[:short_id_url] = short_id_url
+    js[:created_at] = created_at
+    js[:updated_at] = updated_at
+    js[:is_deleted] = is_deleted
+    js[:is_moderated] = is_moderated
+    js[:score] = score
+    js[:flags] = flags
+    __r2rt_static_field_mapping_value = self.parent_comment && self.parent_comment.short_id
+    if __r2rt_static_field_mapping_value.is_a?(Symbol)
+      js[:parent_comment] = __send__(__r2rt_static_field_mapping_value)
+    else
+      js[:parent_comment] = __r2rt_static_field_mapping_value
     end
+    if self.is_gone?
+      js[:comment] = "<em>#{self.gone_text}</em>"
+    else
+      js[:comment] = markeddown_comment
+    end
+    if self.is_gone?
+      __r2rt_static_field_mapping_value = self.gone_text
+      if __r2rt_static_field_mapping_value.is_a?(Symbol)
+        js[:comment_plain] = __send__(__r2rt_static_field_mapping_value)
+      else
+        js[:comment_plain] = __r2rt_static_field_mapping_value
+      end
+    else
+      js[:comment_plain] = comment
+    end
+    js[:url] = url
+    js[:indent_level] = indent_level
+    js[:commenting_user] = user
 
     js
   end
@@ -367,17 +389,16 @@ class Comment < ApplicationRecord
   end
 
   def html_class_for_user
-    c = []
     if !self.user.is_active?
-      c.push "inactive_user"
+      "inactive_user"
     elsif self.user.is_new?
-      c.push "new_user"
+      "new_user"
     elsif self.story && self.story.user_is_author? &&
           self.story.user_id == self.user_id
-      c.push "user_is_author"
+      "user_is_author"
+    else
+      ""
     end
-
-    c.join("")
   end
 
   def is_deletable_by_user?(user)

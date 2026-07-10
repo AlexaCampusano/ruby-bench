@@ -28,23 +28,32 @@ private
 
   def cache_votes(scope)
     if @user
-      votes = Vote.votes_by_user_for_stories_hash(@user.id, scope.map(&:id))
-
-      hs = HiddenStory.where(:user_id => @user.id, :story_id =>
-        scope.map(&:id)).map(&:story_id)
-      ss = SavedStory.where(:user_id => @user.id, :story_id =>
-        scope.map(&:id)).map(&:story_id)
-
+      __r2rt_repeated_id_membership_ids = []
+      scope.each do |__r2rt_repeated_id_membership_item|
+        __r2rt_repeated_id_membership_ids << __r2rt_repeated_id_membership_item.id
+      end
+      votes = Vote.votes_by_user_for_stories_hash(@user.id, __r2rt_repeated_id_membership_ids)
+      hs = {}
+      HiddenStory.where(:user_id => @user.id, :story_id =>
+        __r2rt_repeated_id_membership_ids).each do |__r2rt_repeated_id_membership_hs_member|
+        hs[__r2rt_repeated_id_membership_hs_member.story_id] = true
+      end
+      ss = {}
+      SavedStory.where(:user_id => @user.id, :story_id =>
+        __r2rt_repeated_id_membership_ids).each do |__r2rt_repeated_id_membership_ss_member|
+        ss[__r2rt_repeated_id_membership_ss_member.story_id] = true
+      end
       scope.each do |s|
-        if votes[s.id]
-          s.vote = votes[s.id]
-        end
-        if hs.include?(s.id)
-          s.is_hidden_by_cur_user = true
-        end
-        if ss.include?(s.id)
-          s.is_saved_by_cur_user = true
-        end
+        __r2rt_repeated_id_membership_key = s.id
+        if votes[__r2rt_repeated_id_membership_key]
+                  s.vote = votes[__r2rt_repeated_id_membership_key]
+                end
+        if hs[__r2rt_repeated_id_membership_key]
+                  s.is_hidden_by_cur_user = true
+                end
+        if ss[__r2rt_repeated_id_membership_key]
+                  s.is_saved_by_cur_user = true
+                end
       end
     end
     scope
