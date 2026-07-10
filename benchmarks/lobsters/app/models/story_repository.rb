@@ -58,7 +58,11 @@ class StoryRepository
   end
 
   def tagged(tags)
-    tagged_story_ids = Tagging.select(:story_id).where(tag_id: tags.map(&:id))
+    tag_ids = []
+    tags.each do |tag|
+      tag_ids << tag.id
+    end
+    tagged_story_ids = Tagging.select(:story_id).where(tag_id: tag_ids)
 
     Story.base(@user).positive_ranked.where(id: tagged_story_ids).order(created_at: :desc)
   end

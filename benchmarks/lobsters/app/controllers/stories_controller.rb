@@ -215,7 +215,11 @@ class StoriesController < ApplicationController
         dsug = true
       end
 
-      sugtags = params[:story][:tags_a].reject {|t| t.to_s.strip == "" }.sort
+      sugtags = []
+      params[:story][:tags_a].each do |tag|
+        sugtags << tag unless tag.to_s.strip == ""
+      end
+      sugtags.sort!
       if @story.tags_a.sort != sugtags
         @story.save_suggested_tags_a_for_user!(sugtags, @user)
         dsug = true
@@ -375,7 +379,7 @@ class StoriesController < ApplicationController
       }
       # json: https://github.com/lobsters/lobsters/pull/555
       format.json {
-        similar_stories = @story.public_similar_stories(@user).map(&:as_json)
+        similar_stories = @story.public_similar_stories(@user).map {|story| story.as_json }
 
         render :json => @story.as_json.merge(similar_stories: similar_stories)
       }
@@ -417,11 +421,12 @@ private
   def find_story
     story = Story.find_by(:short_id => params[:story_id])
     if @user && story
-      story.vote = Vote.find_by(
+      vote = Vote.find_by(
         user: @user,
         story: story.id,
         comment:  nil
-      ).try(:vote)
+      )
+      story.vote = vote&.vote
     end
 
     story
@@ -435,12 +440,13 @@ private
   end
 
   def find_user_story
-    if @user.is_moderator?
-      @story = Story.where(:short_id => params[:story_id] || params[:id]).first
+    story = if @user.is_moderator?
+      Story.where(:short_id => params[:story_id] || params[:id]).first
     else
-      @story = Story.where(:user_id => @user.id, :short_id =>
+      Story.where(:user_id => @user.id, :short_id =>
         (params[:story_id] || params[:id])).first
     end
+    @story = story
 
     if !@story
       flash[:error] = "Could not find story or you are not authorized " <<

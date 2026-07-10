@@ -79,11 +79,12 @@ class Markdowner
     node.css("img").each do |img|
       link = node.create_element('a')
 
-      link['href'], title, alt = img.attributes
-        .values_at('src', 'title', 'alt')
-        .map(&:to_s)
+      attributes = img.attributes
+      link['href'] = attributes['src'].to_s
+      title = attributes['title'].to_s
+      alt = attributes['alt'].to_s
 
-      link.content = [title, alt, link['href']].find(&:present?)
+      link.content = [title, alt, link['href']].find {|value| value.present? }
 
       img.replace link
     end

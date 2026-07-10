@@ -82,7 +82,7 @@ class Comment < ApplicationRecord
       errors.add(:hat, "not wearable by user")
 
     # .try so tests don't need to persist a story and user
-    self.story.try(:accepting_comments?) ||
+    self.story&.accepting_comments? ||
       errors.add(:base, "Story is no longer accepting comments.")
   end
 
@@ -106,43 +106,44 @@ class Comment < ApplicationRecord
     parents = self.order(
       Arel.sql("comments.score < 0 ASC, comments.confidence DESC")
     )
-      .group_by(&:parent_comment_id)
+      .group_by {|comment| comment.parent_comment_id }
 
     # top-down list of comments, regardless of indent level
     ordered = []
 
-    ancestors = [nil] # nil sentinel so indent_level starts at 1 without add op.
-    subtree = parents[nil]
+    subtree_stack = parents[nil] ? [[parents[nil], 0]] : []
 
-    while subtree
-      if (node = subtree.shift)
-        children = parents[node.id]
-
-        clear_replies_cache = true if user && node.user_id == user.id
-
-        # for deleted comments, if they have no children, they can be removed
-        # from the tree.  otherwise they have to stay and a "[deleted]" stub
-        # will be shown
-        if node.is_gone? && # deleted or moderated
-           !children.present? && # don't have child comments
-           (!user || (!user.is_moderator? && node.user_id != user.id))
-          # admins and authors should be able to see their deleted comments
-          next
-        end
-
-        node.indent_level = ancestors.length
-        ordered << node
-
-        # no children to recurse
-        next unless children
-
-        # drill down a level
-        ancestors << subtree
-        subtree = children
-      else
-        # climb back out
-        subtree = ancestors.pop
+    while (frame = subtree_stack.last)
+      subtree, index = frame
+      if index >= subtree.length
+        subtree_stack.pop
+        next
       end
+
+      node = subtree[index]
+      frame[1] = index + 1
+      children = parents[node.id]
+
+      clear_replies_cache = true if user && node.user_id == user.id
+
+      # for deleted comments, if they have no children, they can be removed
+      # from the tree.  otherwise they have to stay and a "[deleted]" stub
+      # will be shown
+      if node.is_gone? && # deleted or moderated
+         !children.present? && # don't have child comments
+         (!user || (!user.is_moderator? && node.user_id != user.id))
+        # admins and authors should be able to see their deleted comments
+        next
+      end
+
+      node.indent_level = subtree_stack.length
+      ordered << node
+
+      # no children to recurse
+      next unless children
+
+      # drill down a level
+      subtree_stack << [children, 0]
     end
 
     Rails.cache.delete("user:#{user.id}:unread_replies") if clear_replies_cache
@@ -164,37 +165,22 @@ class Comment < ApplicationRecord
   end
 
   def as_json(_options = {})
-    h = [
-      :short_id,
-      :short_id_url,
-      :created_at,
-      :updated_at,
-      :is_deleted,
-      :is_moderated,
-      :score,
-      :flags,
-      { :parent_comment => self.parent_comment && self.parent_comment.short_id },
-      { :comment => (self.is_gone? ? "<em>#{self.gone_text}</em>" : :markeddown_comment) },
-      { :comment_plain => (self.is_gone? ? self.gone_text : :comment) },
-      :url,
-      :indent_level,
-      { :commenting_user => :user },
-    ]
-
-    js = {}
-    h.each do |k|
-      if k.is_a?(Symbol)
-        js[k] = self.send(k)
-      elsif k.is_a?(Hash)
-        if k.values.first.is_a?(Symbol)
-          js[k.keys.first] = self.send(k.values.first)
-        else
-          js[k.keys.first] = k.values.first
-        end
-      end
-    end
-
-    js
+    {
+      :short_id => self.short_id,
+      :short_id_url => self.short_id_url,
+      :created_at => self.created_at,
+      :updated_at => self.updated_at,
+      :is_deleted => self.is_deleted,
+      :is_moderated => self.is_moderated,
+      :score => self.score,
+      :flags => self.flags,
+      :parent_comment => self.parent_comment && self.parent_comment.short_id,
+      :comment => (self.is_gone? ? "<em>#{self.gone_text}</em>" : self.markeddown_comment),
+      :comment_plain => (self.is_gone? ? self.gone_text : self.comment),
+      :url => self.url,
+      :indent_level => self.indent_level,
+      :commenting_user => self.user,
+    }
   end
 
   def assign_initial_confidence
@@ -266,7 +252,12 @@ class Comment < ApplicationRecord
   end
 
   def deliver_mention_notifications
-    self.plaintext_comment.scan(/\B\@([\w\-]+)/).flatten.uniq.each do |mention|
+    seen_mentions = {}
+    self.plaintext_comment.scan(/\B\@([\w\-]+)/).each do |match|
+      mention = match.first
+      next if seen_mentions.key?(mention)
+
+      seen_mentions[mention] = true
       if (u = User.active.find_by(:username => mention))
         if u.id == self.user.id
           next
@@ -300,7 +291,7 @@ class Comment < ApplicationRecord
     end
 
     if self.parent_comment_id &&
-       (u = self.parent_comment.try(:user)) &&
+       (u = self.parent_comment&.user) &&
        u.id != self.user.id &&
        u.is_active?
       users_following_thread << u
@@ -352,9 +343,11 @@ class Comment < ApplicationRecord
 
   def gone_text
     if self.is_moderated?
+      moderation = self.moderation
+      moderator = moderation&.moderator
       "Comment removed by moderator " <<
-        self.moderation.try(:moderator).try(:username).to_s << ": " <<
-        (self.moderation.try(:reason) || "No reason given")
+        moderator&.username.to_s << ": " <<
+        (moderation&.reason || "No reason given")
     elsif self.user.is_banned?
       "Comment from banned user removed"
     else
@@ -450,7 +443,7 @@ class Comment < ApplicationRecord
       self.short_id,
       self.is_from_email ? "email" : nil,
       created_at.to_i,
-    ].reject(&:!).join(".") << "@" << Rails.application.domain
+    ].compact.join(".") << "@" << Rails.application.domain
   end
 
   def path
@@ -519,15 +512,17 @@ class Comment < ApplicationRecord
       r_users[v.reason.to_s].push v.user.username
     end
 
-    r_counts.keys.map {|k|
+    summary = []
+    r_counts.keys.each do |k|
       next if k == ""
 
       o = "#{r_counts[k]} #{Vote::ALL_COMMENT_REASONS[k]}"
       if u && u.is_moderator? && self.user_id != u.id
         o << " (#{r_users[k].join(', ')})"
       end
-      o
-    }.compact.join(", ")
+      summary << o
+    end
+    summary.join(", ")
   end
 
   def undelete_for_user(user)

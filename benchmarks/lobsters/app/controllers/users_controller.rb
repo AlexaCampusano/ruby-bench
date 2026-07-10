@@ -15,7 +15,7 @@ class UsersController < ApplicationController
       @title_class = :new_user
     end
 
-    if @user.try(:is_moderator?)
+    if @user&.is_moderator?
       @mod_note = ModNote.new(user: @showing_user)
       @mod_note.note = params[:note]
     end
@@ -52,7 +52,7 @@ class UsersController < ApplicationController
       content = Rails.cache.fetch("users_tree_#{newest_user}", :expires_in => (60 * 60 * 24)) {
         users = User.select(*attrs).order("id DESC").to_a
         @user_count = users.length
-        @users_by_parent = users.group_by(&:invited_by_user_id)
+      @users_by_parent = users.group_by {|user| user.invited_by_user_id }
         @newest = User.select(*attrs).order("id DESC").limit(10)
         render_to_string :action => "tree", :layout => nil
       }
@@ -126,7 +126,11 @@ class UsersController < ApplicationController
     int = @flag_warning_int
 
     fc = FlaggedCommenters.new(int[:param], 1.day)
-    @fc_flagged = fc.commenters.map {|_, c| c[:n_flags] }.sort
+    @fc_flagged = []
+    fc.commenters.each do |_, commenter|
+      @fc_flagged << commenter[:n_flags]
+    end
+    @fc_flagged.sort!
     @flagged_user_stats = fc.check_list_for(@showing_user)
 
     rows = ActiveRecord::Base.connection.exec_query("

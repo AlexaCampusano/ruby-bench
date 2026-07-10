@@ -49,8 +49,8 @@ module TrafficHelper
 
   def self.current_intensity(low, high)
     return 0.5 if low.nil? || high.nil? || high == low
-    activity = [low, current_activity, high].sort[1]
-    [0, ((activity - low)*1.0/(high - low) * 100).round, 100].sort[1]
+    activity = [[current_activity, low].max, high].min
+    [[((activity - low)*1.0/(high - low) * 100).round, 0].max, 100].min
   end
 
   def self.cached_current_intensity

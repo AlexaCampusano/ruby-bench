@@ -8,11 +8,12 @@ class TagsController < ApplicationController
     @categories = Category.all.order('category asc').includes(:tags)
     @tags = Tag.all
 
-    if @user
-      @filtered_tags = @user.tag_filter_tags.index_by(&:id)
+    filtered_tags = if @user
+      @user.tag_filter_tags.index_by {|tag| tag.id }
     else
-      @filtered_tags = tags_filtered_by_cookie.index_by(&:id)
+      tags_filtered_by_cookie.index_by {|tag| tag.id }
     end
+    @filtered_tags = filtered_tags
 
     respond_to do |format|
       format.html { render :action => "index" }

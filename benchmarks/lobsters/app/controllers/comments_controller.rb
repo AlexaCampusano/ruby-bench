@@ -235,7 +235,7 @@ class CommentsController < ApplicationController
   end
 
   def index
-    @rss_link ||= {
+    @rss_link = {
       :title => "RSS 2.0 - Newest Comments",
       :href => "/comments.rss" + (@user ? "?token=#{@user.rss_token}" : ""),
     }
@@ -258,7 +258,11 @@ class CommentsController < ApplicationController
       .offset((@page - 1) * COMMENTS_PER_PAGE)
 
     if @user
-      @votes = Vote.comment_votes_by_user_for_comment_ids_hash(@user.id, @comments.map(&:id))
+      comment_ids = []
+      @comments.each do |comment|
+        comment_ids << comment.id
+      end
+      @votes = Vote.comment_votes_by_user_for_comment_ids_hash(@user.id, comment_ids)
 
       @comments.each do |c|
         if @votes[c.id]
@@ -280,7 +284,7 @@ class CommentsController < ApplicationController
   end
 
   def upvoted
-    @rss_link ||= {
+    @rss_link = {
       :title => "RSS 2.0 - Newest Comments",
       :href => upvoted_comments_path(format: :rss) + (@user ? "?token=#{@user.rss_token}" : ""),
     }
@@ -306,7 +310,11 @@ class CommentsController < ApplicationController
 
     # TODO: respect hidden stories
 
-    @votes = Vote.comment_votes_by_user_for_comment_ids_hash(@user.id, @comments.map(&:id))
+    comment_ids = []
+    @comments.each do |comment|
+      comment_ids << comment.id
+    end
+    @votes = Vote.comment_votes_by_user_for_comment_ids_hash(@user.id, comment_ids)
     @comments.each do |c|
       c.current_vote = @votes[c.id]
     end
@@ -346,11 +354,29 @@ class CommentsController < ApplicationController
       .joins(:story).where.not(stories: { is_deleted: true })
       .arrange_for_user(@user)
 
-    comments_by_thread_id = comments.group_by(&:thread_id)
-    @threads = comments_by_thread_id.values_at(*thread_ids).compact
+    comments_by_thread_id = {}
+    comments.each do |comment|
+      (comments_by_thread_id[comment.thread_id] ||= []) << comment
+    end
+
+    @threads = []
+    thread_ids.each do |thread_id|
+      thread = comments_by_thread_id[thread_id]
+      @threads << thread if thread
+    end
 
     if @user
-      @votes = Vote.comment_votes_by_user_for_story_hash(@user.id, comments.map(&:story_id).uniq)
+      story_ids = []
+      seen_story_ids = {}
+      comments.each do |comment|
+        story_id = comment.story_id
+        next if seen_story_ids.key?(story_id)
+
+        seen_story_ids[story_id] = true
+        story_ids << story_id
+      end
+
+      @votes = Vote.comment_votes_by_user_for_story_hash(@user.id, story_ids)
 
       comments.each do |c|
         if @votes[c.id]

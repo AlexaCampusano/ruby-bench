@@ -39,11 +39,11 @@ class HomeController < ApplicationController
       paginate stories.hottest
     }
 
-    @rss_link ||= {
+    @rss_link = {
       :title => "RSS 2.0",
       :href => user_token_link("/rss"),
     }
-    @comments_rss_link ||= {
+    @comments_rss_link = {
       :title => "Comments - RSS 2.0",
       :href => user_token_link("/comments.rss"),
     }
@@ -138,7 +138,7 @@ class HomeController < ApplicationController
       paginate stories.saved
     }
 
-    @rss_link ||= {
+    @rss_link = {
       :title => "RSS 2.0",
       :href => user_token_link("/saved.rss"),
     }
@@ -168,7 +168,7 @@ class HomeController < ApplicationController
       paginate stories.categories(@categories)
     end
 
-    @title = @categories.map(&:category).join(' ')
+    @title = @categories.map {|category| category.category }.join(' ')
     @above = 'category'
 
     @rss_link = {
@@ -264,14 +264,15 @@ class HomeController < ApplicationController
       paginate stories.top(length)
     }
 
-    if length[:dur] > 1
-      @title = "Top Stories of the Past #{length[:dur]} #{length[:intv]}"
+    title = if length[:dur] > 1
+      "Top Stories of the Past #{length[:dur]} #{length[:intv]}"
     else
-      @title = "Top Stories of the Past #{length[:intv]}"
+      "Top Stories of the Past #{length[:intv]}"
     end
+    @title = title
     @above = 'stories/subnav'
 
-    @rss_link ||= {
+    @rss_link = {
       :title => "RSS 2.0 - " + @title,
       :href => "/top/rss",
     }
@@ -312,9 +313,9 @@ private
 
   def filtered_tag_ids
     if @user
-      @user.tag_filters.map(&:tag_id)
+      @user.tag_filters.map {|tag_filter| tag_filter.tag_id }
     else
-      tags_filtered_by_cookie.map(&:id)
+      tags_filtered_by_cookie.map {|tag| tag.id }
     end
   end
 
@@ -340,7 +341,11 @@ private
     if Rails.env.development? || @user || tags_filtered_by_cookie.any?
       yield
     else
-      key = opts.merge(page: page).sort.map {|k, v| "#{k}=#{v.to_param}" }.join(" ")
+      key_parts = []
+      opts.merge(page: page).sort.each do |k, v|
+        key_parts << "#{k}=#{v.to_param}"
+      end
+      key = key_parts.join(" ")
       begin
         Rails.cache.fetch("stories #{key}", :expires_in => 45, &block)
       rescue Errno::ENOENT => e

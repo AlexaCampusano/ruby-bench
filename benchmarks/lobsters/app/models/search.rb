@@ -31,7 +31,11 @@ class Search
   end
 
   def to_url_params
-    [:q, :what, :order].map {|p| "#{p}=#{CGI.escape(self.send(p).to_s)}" }.join("&amp;")
+    [
+      "q=#{CGI.escape(self.q.to_s)}",
+      "what=#{CGI.escape(self.what.to_s)}",
+      "order=#{CGI.escape(self.order.to_s)}",
+    ].join("&amp;")
   end
 
   def page_count
@@ -77,7 +81,7 @@ class Search
   def with_stories_matching_tags(base, tag_scopes)
     story_ids_matching_tags = with_tags(
       Story.unmerged.where(is_deleted: false), tag_scopes
-    ).select(:id).map(&:id)
+    ).pluck(:id)
     base.where(story_id: story_ids_matching_tags)
   end
 
@@ -197,7 +201,11 @@ class Search
     if user
       case what
       when "stories"
-        votes = Vote.story_votes_by_user_for_story_ids_hash(user.id, self.results.map(&:id))
+        story_ids = []
+        self.results.each do |result|
+          story_ids << result.id
+        end
+        votes = Vote.story_votes_by_user_for_story_ids_hash(user.id, story_ids)
 
         self.results.each do |r|
           if votes[r.id]
@@ -206,7 +214,11 @@ class Search
         end
 
       when "comments"
-        votes = Vote.comment_votes_by_user_for_comment_ids_hash(user.id, self.results.map(&:id))
+        comment_ids = []
+        self.results.each do |result|
+          comment_ids << result.id
+        end
+        votes = Vote.comment_votes_by_user_for_comment_ids_hash(user.id, comment_ids)
 
         self.results.each do |r|
           if votes[r.id]

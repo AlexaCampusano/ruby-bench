@@ -326,8 +326,8 @@ class Story < ApplicationRecord
 
   def self.recalculate_all_hotnesses!
     # do the front page first, since find_each can't take an order
-    Story.order("id DESC").limit(100).each(&:recalculate_hotness!)
-    Story.find_each(&:recalculate_hotness!)
+    Story.order("id DESC").limit(100).each {|story| story.recalculate_hotness! }
+    Story.find_each {|story| story.recalculate_hotness! }
     true
   end
 
@@ -345,38 +345,30 @@ class Story < ApplicationRecord
   end
 
   def as_json(options = {})
-    h = [
-      :short_id,
-      :short_id_url,
-      :created_at,
-      :title,
-      :url,
-      :score,
-      :score,
-      :flags,
-      { :comment_count => :comments_count },
-      { :description => :markeddown_description },
-      { :description_plain => :description },
-      :comments_url,
-      { :submitter_user => :user },
-      { :tags => self.tags.map(&:tag).sort },
-    ]
+    tag_names = []
+    self.tags.each do |tag|
+      tag_names << tag.tag
+    end
+    tag_names.sort!
+
+    js = {
+      :short_id => self.short_id,
+      :short_id_url => self.short_id_url,
+      :created_at => self.created_at,
+      :title => self.title,
+      :url => self.url,
+      :score => self.score,
+      :flags => self.flags,
+      :comment_count => self.comments_count,
+      :description => self.markeddown_description,
+      :description_plain => self.description,
+      :comments_url => self.comments_url,
+      :submitter_user => self.user,
+      :tags => tag_names,
+    }
 
     if options && options[:with_comments]
-      h.push(:comments => options[:with_comments])
-    end
-
-    js = {}
-    h.each do |k|
-      if k.is_a?(Symbol)
-        js[k] = self.send(k)
-      elsif k.is_a?(Hash)
-        if k.values.first.is_a?(Symbol)
-          js[k.keys.first] = self.send(k.values.first)
-        else
-          js[k.keys.first] = k.values.first
-        end
-      end
+      js[:comments] = options[:with_comments]
     end
 
     js
@@ -401,7 +393,11 @@ class Story < ApplicationRecord
     cpoints = self.merged_comments.where.not(user_id: self.user_id).sum(sum_expression).to_f * 0.5
 
     # mix in any stories this one cannibalized
-    cpoints += self.merged_stories.map(&:score).inject(&:+).to_f
+    merged_scores = []
+    self.merged_stories.each do |story|
+      merged_scores << story.score
+    end
+    cpoints += merged_scores.inject {|sum, score| sum + score }.to_f
 
     # if a story has many comments but few votes, it's probably a bad story, so
     # cap the comment points at the number of upvotes
@@ -431,7 +427,7 @@ class Story < ApplicationRecord
   def can_have_images?
     # doesn't test self.editor so a user can't trick a mod into editing a
     # story to enable an image
-    self.user.try(:is_moderator?)
+    self.user&.is_moderator?
   end
 
   def can_have_suggestions_from_user?(user)
@@ -513,13 +509,7 @@ class Story < ApplicationRecord
   def fix_bogus_chars
     # this is needlessly complicated to work around character encoding issues
     # that arise when doing just self.title.to_s.gsub(160.chr, "")
-    self.title = self.title.to_s.split("").map {|chr|
-      if chr.ord == 160
-        " "
-      else
-        chr
-      end
-    }.join("")
+    self.title = self.title.to_s.gsub([160].pack("U"), " ")
 
     true
   end
@@ -636,7 +626,7 @@ class Story < ApplicationRecord
     if self.editing_from_suggestions
       m.is_from_suggestions = true
     else
-      m.moderator_user_id = self.editor.try(:id)
+      m.moderator_user_id = self.editor&.id
     end
     m.story_id = self.id
 
@@ -682,7 +672,7 @@ class Story < ApplicationRecord
   end
 
   def merge_story_short_id
-    self.merged_story_id ? self.merged_into_story.try(:short_id) : nil
+    self.merged_story_id ? self.merged_into_story&.short_id : nil
   end
 
   def recalculate_hotness!
@@ -708,8 +698,14 @@ class Story < ApplicationRecord
   end
 
   def tagging_changes
-    old_tags_a = self.taggings.reject(&:new_record?).map {|tg| tg.tag.tag }.join(" ")
-    new_tags_a = self.taggings.reject(&:marked_for_destruction?).map {|tg| tg.tag.tag }.join(" ")
+    old_tags = []
+    new_tags = []
+    self.taggings.each do |tagging|
+      old_tags << tagging.tag.tag unless tagging.new_record?
+      new_tags << tagging.tag.tag unless tagging.marked_for_destruction?
+    end
+    old_tags_a = old_tags.join(" ")
+    new_tags_a = new_tags.join(" ")
 
     if old_tags_a == new_tags_a
       {}
@@ -719,7 +715,13 @@ class Story < ApplicationRecord
   end
 
   def tags_a
-    @_tags_a ||= self.taggings.reject(&:marked_for_destruction?).map {|t| t.tag.tag }
+    @_tags_a ||= begin
+      tags = []
+      self.taggings.each do |tagging|
+        tags << tagging.tag.tag unless tagging.marked_for_destruction?
+      end
+      tags
+    end
   end
 
   def tags_a=(new_tag_names_a)
@@ -771,7 +773,8 @@ class Story < ApplicationRecord
 
     # if enough users voted on the same set of replacement tags, do it
     tag_votes = {}
-    self.suggested_taggings.group_by(&:user_id).each do |_u, stg|
+    suggested_taggings_by_user_id = self.suggested_taggings.group_by {|tagging| tagging.user_id }
+    suggested_taggings_by_user_id.each do |_u, stg|
       stg.each do |s|
         tag_votes[s.tag.tag] ||= 0
         tag_votes[s.tag.tag] += 1
@@ -907,7 +910,7 @@ class Story < ApplicationRecord
   end
 
   def url=(u)
-    super(u.try(:strip)) or return if u.blank?
+    super(u&.strip) or return if u.blank?
 
     if (match = u.match(URL_RE))
       # remove well-known port for http and https if present
@@ -964,15 +967,17 @@ class Story < ApplicationRecord
       end
     end
 
-    r_counts.keys.sort.map {|k|
+    summary = []
+    r_counts.keys.sort.each do |k|
       if k == ""
-        "+#{r_counts[k]}"
+        summary << "+#{r_counts[k]}"
       else
-        "#{r_counts[k]} " +
+        summary << "#{r_counts[k]} " +
           (Vote::ALL_STORY_REASONS[k] || k) +
           (user && user.is_moderator? ? " (#{r_whos[k].join(', ')})" : "")
       end
-    }.join(", ")
+    end
+    summary.join(", ")
   end
 
   def fetched_attributes_html
@@ -983,31 +988,29 @@ class Story < ApplicationRecord
     # try <meta property="og:title"> first, it probably won't have the site
     # name
     title = ""
-    begin
-      title = parsed.at_css("meta[property='og:title']")
-        .attributes["content"].text
-    rescue
+    if (title_node = parsed.at_css("meta[property='og:title']")) &&
+       (title_content = title_node["content"])
+      title = title_content.to_s
     end
 
     # then try <meta name="title">
     if title.to_s == ""
-      begin
-        title = parsed.at_css("meta[name='title']").attributes["content"].text
-      rescue
+      if (title_node = parsed.at_css("meta[name='title']")) &&
+         (title_content = title_node["content"])
+        title = title_content.to_s
       end
     end
 
     # then try plain old <title>
     if title.to_s == ""
-      title = parsed.at_css("title").try(:text).to_s
+      title_node = parsed.at_css("title")
+      title = title_node ? title_node.text.to_s : ""
     end
 
     # see if the site name is available, so we can strip it out in case it was
     # present in the fetched title
-    begin
-      site_name = parsed.at_css("meta[property='og:site_name']")
-        .attributes["content"].text
-
+    if (site_name_node = parsed.at_css("meta[property='og:site_name']")) &&
+       (site_name = site_name_node["content"])
       if site_name.present? &&
          site_name.length < title.length &&
          title[-(site_name.length), site_name.length] == site_name
@@ -1018,7 +1021,6 @@ class Story < ApplicationRecord
           title = title[0, title.length - 3]
         end
       end
-    rescue
     end
 
     @fetched_attributes[:title] = title

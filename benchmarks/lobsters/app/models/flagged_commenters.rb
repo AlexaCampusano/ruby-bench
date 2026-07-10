@@ -10,7 +10,18 @@ class FlaggedCommenters
     @interval = interval
     @cache_time = cache_time
     length = time_interval(interval)
-    @period = length[:dur].send(length[:intv].downcase).ago
+    @period = case length[:intv]
+    when "Hour"
+      length[:dur].hours.ago
+    when "Day"
+      length[:dur].days.ago
+    when "Week"
+      length[:dur].weeks.ago
+    when "Month"
+      length[:dur].months.ago
+    when "Year"
+      length[:dur].years.ago
+    end
   end
 
   def check_list_for(showing_user)

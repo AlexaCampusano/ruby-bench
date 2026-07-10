@@ -65,12 +65,9 @@ class ApplicationController < ActionController::Base
   end
 
   def flag_warning
-    @flag_warning_int ||= time_interval('1m')
-    return false #if Rails.env.development? # expensive because Rails doesn't cache in dev
     # Lobsters-bench: turning this off to avoid porting FlaggedCommenters from MySQL to SQLite
-    @show_flag_warning ||= (
-      @user && !!FlaggedCommenters.new(@flag_warning_int[:param], 1.day).check_list_for(@user)
-    )
+    @flag_warning_int = time_interval('1m')
+    false
   end
 
   def mini_profiler

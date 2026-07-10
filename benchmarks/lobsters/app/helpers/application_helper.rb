@@ -56,19 +56,20 @@ module ApplicationHelper
       return (1 .. max).to_a
     end
 
-    pages = (cur - (MAX_PAGES / 2) + 1 .. cur + (MAX_PAGES / 2) - 1).to_a
+    start_page = cur - (MAX_PAGES / 2) + 1
+    end_page = cur + (MAX_PAGES / 2) - 1
 
-    while pages[0] < 1
-      pages.push pages.last + 1
-      pages.shift
+    if start_page < 1
+      end_page += 1 - start_page
+      start_page = 1
     end
 
-    while pages.last > max
-      if pages[0] > 1
-        pages.unshift pages[0] - 1
-      end
-      pages.pop
+    if end_page > max
+      start_page = [start_page - (end_page - max), 1].max
+      end_page = max
     end
+
+    pages = (start_page .. end_page).to_a
 
     if pages[0] != 1
       if pages[0] != 2

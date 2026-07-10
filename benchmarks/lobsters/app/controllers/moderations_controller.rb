@@ -5,7 +5,7 @@ class ModerationsController < ApplicationController
 
   def index
     @title = "Moderation Log"
-    @moderators = ['(All)', '(Users)'] + User.moderators.map(&:username)
+    @moderators = ['(All)', '(Users)'] + User.moderators.map {|user| user.username }
 
     @moderator = params.fetch('moderator', '(All)')
     @what = {

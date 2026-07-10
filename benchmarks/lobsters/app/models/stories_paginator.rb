@@ -28,21 +28,35 @@ private
 
   def cache_votes(scope)
     if @user
-      votes = Vote.votes_by_user_for_stories_hash(@user.id, scope.map(&:id))
+      story_ids = []
+      scope.each do |story|
+        story_ids << story.id
+      end
+
+      votes = Vote.votes_by_user_for_stories_hash(@user.id, story_ids)
 
       hs = HiddenStory.where(:user_id => @user.id, :story_id =>
-        scope.map(&:id)).map(&:story_id)
+        story_ids).map {|hidden_story| hidden_story.story_id }
       ss = SavedStory.where(:user_id => @user.id, :story_id =>
-        scope.map(&:id)).map(&:story_id)
+        story_ids).map {|saved_story| saved_story.story_id }
+
+      hidden_story_ids = {}
+      hs.each do |story_id|
+        hidden_story_ids[story_id] = true
+      end
+      saved_story_ids = {}
+      ss.each do |story_id|
+        saved_story_ids[story_id] = true
+      end
 
       scope.each do |s|
         if votes[s.id]
           s.vote = votes[s.id]
         end
-        if hs.include?(s.id)
+        if hidden_story_ids[s.id]
           s.is_hidden_by_cur_user = true
         end
-        if ss.include?(s.id)
+        if saved_story_ids[s.id]
           s.is_saved_by_cur_user = true
         end
       end

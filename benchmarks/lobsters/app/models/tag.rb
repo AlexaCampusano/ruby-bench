@@ -41,10 +41,14 @@ class Tag < ApplicationRecord
   def self.all_with_filtered_counts_for(user)
     counts = TagFilter.group(:tag_id).count
 
-    Tag.active.order(:tag).select {|t| t.valid_for?(user) }.map {|t|
-      t.filtered_count = counts[t.id].to_i
-      t
-    }
+    tags = []
+    Tag.active.order(:tag).each do |tag|
+      next unless tag.valid_for?(user)
+
+      tag.filtered_count = counts[tag.id].to_i
+      tags << tag
+    end
+    tags
   end
 
   def category_name
@@ -60,12 +64,12 @@ class Tag < ApplicationRecord
   end
 
   def user_can_filter?(user)
-    self.active? && (!self.privileged? || user.try(:is_moderator?))
+    self.active? && (!self.privileged? || user&.is_moderator?)
   end
 
   def valid_for?(user)
     if self.privileged?
-      !!user.try(:is_moderator?)
+      !!user&.is_moderator?
     else
       true
     end

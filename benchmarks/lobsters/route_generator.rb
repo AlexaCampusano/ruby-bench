@@ -89,12 +89,20 @@ class RouteGenerator
 
   private
 
+  def visible_story_short_ids
+    ids = []
+    Story.all.each do |story|
+      ids << story.short_id if story.can_be_seen_by_user?(@user)
+    end
+    ids
+  end
+
   def generate_routes
     do_login # make sure we're logged in
 
     db_ids = {
       comment_id: Comment.all.pluck(:short_id),
-      story_id: Story.all.select { |s| s.can_be_seen_by_user?(@user) }.map(&:short_id),
+      story_id: visible_story_short_ids,
       username: User.all.pluck(:username),
     }
 

@@ -530,7 +530,10 @@ class User < ApplicationRecord
         .where(:stories => { :user_id => self.id }).group(:thread_id)
         .order("MAX(comments.created_at) DESC").limit(amount).pluck(:thread_id)
 
-      thread_ids = thread_ids.uniq.sort.reverse[0, amount]
+      thread_ids = thread_ids.uniq
+      thread_ids.sort!
+      thread_ids.reverse!
+      thread_ids = thread_ids[0, amount]
     end
 
     thread_ids

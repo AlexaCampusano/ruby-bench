@@ -337,7 +337,7 @@ DEPENDENCIES
   byebug
   capybara
   cgi
-  commonmarker (>= 0.23.6, < 1.0)
+  commonmarker (>= 0.23.6, < 1.0.0.pre)
   database_cleaner
   factory_bot_rails
   faker
@@ -373,4 +373,4 @@ DEPENDENCIES
   webmock
 
 BUNDLED WITH
-   2.8.0.dev
+   2.6.9

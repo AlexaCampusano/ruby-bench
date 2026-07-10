@@ -15,11 +15,12 @@ class FiltersController < ApplicationController
     @story_counts = Tagging.group(:tag_id).count
     @filter_counts = TagFilter.group(:tag_id).count
 
-    if @user
-      @filtered_tags = @user.tag_filter_tags.index_by(&:id)
+    filtered_tags = if @user
+      @user.tag_filter_tags.index_by {|tag| tag.id }
     else
-      @filtered_tags = tags_filtered_by_cookie.index_by(&:id)
+      tags_filtered_by_cookie.index_by {|tag| tag.id }
     end
+    @filtered_tags = filtered_tags
   end
 
   def update
@@ -29,7 +30,7 @@ class FiltersController < ApplicationController
     if @user
       @user.tag_filter_tags = new_tags
     else
-      cookies.permanent[TAG_FILTER_COOKIE] = new_tags.map(&:tag).join(",")
+      cookies.permanent[TAG_FILTER_COOKIE] = new_tags.map {|tag| tag.tag }.join(",")
     end
 
     flash[:success] = "Your filters have been updated."

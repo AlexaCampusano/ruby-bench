@@ -14,7 +14,7 @@ class SettingsController < ApplicationController
       flash[:error] = 'You did not check the "I am sure" checkbox.'
       return redirect_to settings_path
     end
-    unless @user.try(:authenticate, params[:user][:password].to_s)
+    unless @user.authenticate(params[:user][:password].to_s)
       flash[:error] = "Given password doesn't match account."
       return redirect_to settings_path
     end
