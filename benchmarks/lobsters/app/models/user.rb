@@ -54,7 +54,7 @@ class User < ApplicationRecord
            :class_name => "Hat",
            :inverse_of => :user
 
-  has_secure_password
+  has_secure_password reset_token: false
 
   typed_store :settings do |s|
     s.string :prefers_color_scheme, :default => "system"
