@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+require_relative "transpiled/runtime"
+require_relative "transpiled/application_helper"
+require_relative "transpiled/comment"
+require_relative "transpiled/comment_singleton"
+require_relative "transpiled/comments_controller"
+require_relative "transpiled/flagged_commenters"
+require_relative "transpiled/keystore_singleton"
+require_relative "transpiled/message"
+require_relative "transpiled/replies_controller"
+require_relative "transpiled/search"
+require_relative "transpiled/stories_controller"
+require_relative "transpiled/stories_paginator"
+require_relative "transpiled/story"
+require_relative "transpiled/tag"
+require_relative "transpiled/user"
+require_relative "transpiled/vote_singleton"
